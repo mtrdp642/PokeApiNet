@@ -82,6 +82,19 @@ pokeClient.ClearCache();
 
 Additional overloads are provided to allow for clearing the individual caches for resources and pages, as well as by type of cache.
 
+### Cache expiration
+
+By default, a `PokeApiClient` instance neither sets limits to how many cache entries can be stored nor any form of expiration policy.
+Memory is a scarce resource, so consumers should try to limit the cache growth over time by using expiration policies.
+
+The client API allows this through the `SetCacheExpirationOptions`, `SetResourceCacheExpirationOptions`and `SetResourceListCacheExpirationOptions` methods.
+Its strongly adviced to at least set a _sliding expiration_ value. 
+
+```cs
+PokeApiClient client = new PokeApiClient();
+client.SetCacheExpirationOptions(new CacheExpirationOptions { SlidingExpiration = TimeSpan.FromMinutes(5) });
+```
+
 # Build
 ```
 dotnet build

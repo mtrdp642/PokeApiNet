@@ -1,21 +1,16 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using PokeApiNet.Models;
+﻿using PokeApiNet.Models;
 using System;
-using System.Collections.Immutable;
 
 namespace PokeApiNet.Cache
 {
     /// <summary>
     /// Manages caches for instances of subclasses from <see cref="ResourceList{T}"/>
     /// </summary>
-    internal sealed class ResourceListCacheManager : BaseCacheManager, IDisposable
+    internal sealed class ResourceListCacheManager : BaseCacheManager<ExpirableResourceListCache>
     {
-        private IImmutableDictionary<System.Type, ListCache> listCaches;
-
-        public ResourceListCacheManager()
+        public ResourceListCacheManager(CacheOptions cacheOptions)
+            : base(cacheOptions)
         {
-            // TODO allow configuration of experiation policies
-            this.listCaches = ResourceTypes.ToImmutableDictionary(x => x, _ => new ListCache());
         }
 
         /// <summary>
@@ -36,7 +31,7 @@ namespace PokeApiNet.Cache
                 throw new NotSupportedException($"{resourceType.FullName} is not supported.");
             }
 
-            listCaches[resourceType].Store(url, obj);
+            Cache[resourceType].Store(url, obj);
         }
 
         /// <summary>
@@ -50,7 +45,7 @@ namespace PokeApiNet.Cache
         public ApiResourceList<T> GetApiResourceList<T>(string url) where T : ApiResource
         {
             System.Type resourceType = typeof(T);
-            return listCaches[resourceType].Get<T>(url) as ApiResourceList<T>;
+            return Cache[resourceType].Get<T>(url) as ApiResourceList<T>;
         }
 
         /// <summary>
@@ -64,71 +59,10 @@ namespace PokeApiNet.Cache
         public NamedApiResourceList<T> GetNamedResourceList<T>(string url) where T : NamedApiResource
         {
             System.Type resourceType = typeof(T);
-            return listCaches[resourceType].Get<T>(url) as NamedApiResourceList<T>;
+            return Cache[resourceType].Get<T>(url) as NamedApiResourceList<T>;
         }
 
-        /// <summary>
-        /// Clears all caches
-        /// </summary>
-        public void ClearAll()
-        {
-            foreach (ListCache cache in listCaches.Values)
-            {
-                cache.Clear();
-            }
-        }
-
-        /// <summary>
-        /// Clears a specific cache
-        /// </summary>
-        /// <typeparam name="T">The type of cache to clear</typeparam>
-        public void Clear<T>() where T : ResourceBase
-        {
-            System.Type type = typeof(T);
-            listCaches[type].Clear();
-        }
-
-        public void Dispose()
-        {
-            foreach(ListCache cache in listCaches.Values)
-            {
-                cache.Dispose();
-            }
-            listCaches = null;
-        }
-
-        private sealed class ListCache : BaseExpirableCache, IDisposable
-        {
-            private MemoryCache urlCache;
-
-            public ListCache()
-            {
-                // TODO allow configuration of expiration policies
-                urlCache = new MemoryCache(new MemoryCacheOptions());
-            }
-
-            public void Store<T>(string url, ResourceList<T> resourceList)
-                where T : ResourceBase
-            {
-                urlCache.Set(url, resourceList, CacheEntryOptions);
-            }
-
-            /// <summary>
-            /// Clears all cache data
-            /// </summary>
-            public void Clear()
-            {
-                ExpireAll();
-            }
-
-            public ResourceList<T> Get<T>(string url) where T : ResourceBase => urlCache.Get<ResourceList<T>>(url);
-
-            public void Dispose()
-            {
-                this.Clear();
-                urlCache.Dispose();
-                urlCache = null;
-            }
-        }
+        protected override ExpirableResourceListCache CreateCacheForResource(CacheOptions cacheOptions)
+            => new ExpirableResourceListCache(cacheOptions, this.ExpirationOptionsChanges);
     }
 }

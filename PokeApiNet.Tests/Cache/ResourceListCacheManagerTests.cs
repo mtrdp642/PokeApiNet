@@ -1,4 +1,6 @@
-﻿using PokeApiNet.Cache;
+﻿using FluentAssertions;
+using NSubstitute;
+using PokeApiNet.Cache;
 using PokeApiNet.Models;
 using System;
 using Xunit;
@@ -8,10 +10,12 @@ namespace PokeApiNet.Tests.Cache
     public class ResourceListCacheManagerTests
     {
         private readonly string testUrl;
+        private readonly CacheOptions cacheOptions;
 
         public ResourceListCacheManagerTests()
         {
-            testUrl = "unit-test";
+            this.testUrl = "unit-test";
+            this.cacheOptions = new CacheOptions();
         }
 
         [Fact]
@@ -164,6 +168,19 @@ namespace PokeApiNet.Tests.Cache
             });
         }
 
+        [Fact]
+        public void CorrectlyDisposes()
+        {
+            IObserver<CacheExpirationOptions> fakeObserver = Substitute.For<IObserver<CacheExpirationOptions>>();
+            ResourceListCacheManager sut = CreateSut();
+            sut.ExpirationOptionsChanges.Subscribe(fakeObserver);
+
+            sut.Dispose();
+
+            fakeObserver.Received().OnCompleted();
+            sut.CachedTypes.Should().BeEmpty();
+        }
+
         private (string, ApiResourceList<T>) CreateFakeApiResourceList<T>(string url = null)
             where T : ApiResource
         {
@@ -176,9 +193,9 @@ namespace PokeApiNet.Tests.Cache
             return (url ?? typeof(T).Name, new NamedApiResourceList<T>());
         }
 
-        private static ResourceListCacheManager CreateSut()
+        private ResourceListCacheManager CreateSut()
         {
-            return new ResourceListCacheManager();
+            return new ResourceListCacheManager(this.cacheOptions);
         }
 
         private class TestResourceList : ResourceList<TestResource> { }

@@ -1,4 +1,6 @@
-﻿using PokeApiNet.Cache;
+﻿using FluentAssertions;
+using NSubstitute;
+using PokeApiNet.Cache;
 using PokeApiNet.Models;
 using System;
 using Xunit;
@@ -7,12 +9,19 @@ namespace PokeApiNet.Tests.Cache
 {
     public class ResourceCacheManagerTests
     {
+        private readonly CacheOptions cacheOptions;
+
+        public ResourceCacheManagerTests()
+        {
+            this.cacheOptions = new CacheOptions();
+        }
+
         [Fact]
         [Trait("Category", "Unit")]
         public void Get_StoredId_ReturnsResource()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             sut.Store(berry);
 
@@ -28,7 +37,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_NonStoredId_ReturnsNull()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             sut.Store(berry);
 
@@ -44,7 +53,7 @@ namespace PokeApiNet.Tests.Cache
         public void StoreThrowsIfTypeNotSupported()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             TestClass test = new TestClass { Id = 1 };
 
             // assert
@@ -60,7 +69,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_ByIdOnEmptyCache_ReturnsNull()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
 
             // act
             Pokedex retrievedPokedex = sut.Get<Pokedex>(1);
@@ -74,7 +83,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_ByNameOnEmptyCache_ReturnsNull()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
 
             // act
             Pokemon retrievedPokemon = sut.Get<Pokemon>("pikachu");
@@ -88,7 +97,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_StoredName_ReturnsResource()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             sut.Store(berry);
 
@@ -104,7 +113,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_NonStoredName_ReturnsNull()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             sut.Store(berry);
 
@@ -120,7 +129,7 @@ namespace PokeApiNet.Tests.Cache
         public void AllCacheIsCleared()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             Pokedex pokedex = new Pokedex { Name = "dex", Id = 1 };
             sut.Store(berry);
@@ -141,7 +150,7 @@ namespace PokeApiNet.Tests.Cache
         public void CacheIsClearedForSpecificType()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "cheri", Id = 1 };
             Pokedex pokedex = new Pokedex { Name = "cheri", Id = 1 };
             sut.Store(berry);
@@ -162,7 +171,7 @@ namespace PokeApiNet.Tests.Cache
         public void Get_StoredNameWithDifferentCasing_ReturnsResource()
         {
             // assemble
-            ResourceCacheManager sut = new ResourceCacheManager();
+            ResourceCacheManager sut = CreateSut();
             Berry berry = new Berry { Name = "CHERI" };
             sut.Store(berry);
 
@@ -173,7 +182,25 @@ namespace PokeApiNet.Tests.Cache
             Assert.Same(berry, retrievedBerry);
         }
 
-        class TestClass : ResourceBase
+        [Fact]
+        public void CorrectlyDisposes()
+        {
+            IObserver<CacheExpirationOptions> fakeObserver = Substitute.For<IObserver<CacheExpirationOptions>>();
+            ResourceCacheManager sut = CreateSut();
+            sut.ExpirationOptionsChanges.Subscribe(fakeObserver);
+
+            sut.Dispose();
+
+            fakeObserver.Received().OnCompleted();
+            sut.CachedTypes.Should().BeEmpty();
+        }
+
+        private ResourceCacheManager CreateSut()
+        {
+            return new ResourceCacheManager(this.cacheOptions);
+        }
+
+        private sealed class TestClass : ResourceBase
         {
             public override int Id { get; set; } = 1;
 
